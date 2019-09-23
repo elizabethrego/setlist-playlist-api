@@ -1,0 +1,12 @@
+# package directories
+node_modules
+jspm_packages
+
+# Serverless directories
+.serverless
+
+# macOS system files
+.DS_store
+
+# environment variables
+serverless.env.yml

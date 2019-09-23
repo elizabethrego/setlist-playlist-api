@@ -1,0 +1,16 @@
+
+searchArtists:
+    handler: src/searchArtists.handler
+    description: Search Setlist.fm API for exact artist name
+    events:
+      - http:
+          path: searchArtists/handler
+          method: get
+          request:
+            parameters:
+              querystrings:
+                artist: false
+    environment:
+      SETLISTFM_SEARCH_ARTIST_ENDPOINT: https://api.setlist.fm/rest/1.0/search/artists?artistName=
+      STRING_NO_ARTIST_MATCH: Sorry, no match found. Search for an exact artist name.
+      STRING_NO_ARTIST_PROVIDED: Search for an exact artist name.

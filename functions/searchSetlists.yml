@@ -1,0 +1,15 @@
+
+searchSetlists:
+    handler: src/searchSetlists.handler
+    description: Search Setlist.fm API for given artist's setlist
+    events:
+      - http:
+          path: searchSetlists/handler
+          method: get
+          request:
+            parameters:
+              querystrings:
+                artist: false
+    environment:
+      SETLISTFM_SEARCH_SETLIST_ENDPOINT: https://api.setlist.fm/rest/1.0/search/setlists?artistMbid=
+      STRING_NO_SETLIST_MATCH: Sorry, no setlist found.
