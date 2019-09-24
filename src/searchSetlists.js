@@ -14,6 +14,8 @@ const options = {
   }
 };
 
+let artistMbid, artistName;
+
 module.exports.handler = (event, context, callback) => {
   console.log('Request:' + JSON.stringify(event));
 
@@ -24,31 +26,37 @@ module.exports.handler = (event, context, callback) => {
 
 function searchForSetlist(event, callback) {
 
-  if (event.queryStringParameters && event.queryStringParameters.artistMbid) {
-    let artistMbid =  event.queryStringParameters.artistMbid;
-    console.log('Searching for Setlists for Artist MBID:' + artistMbid);
-    
-    let responseData = new Array(50);
+  if (event.queryStringParameters && event.queryStringParameters.artistMbid && event.queryStringParameters.artistName) {
+    artistMbid =  event.queryStringParameters.artistMbid;
+    artistName =  event.queryStringParameters.artistName;
+    console.log('Searching for Setlists for Artist Name & MBID:' + artistName + ', ' + artistMbid);
 
     https.get(searchSetlistURL + artistMbid, options, (res) => {
-
       console.log('Status Code:' + res.statusCode);
       console.log('Headers:' + JSON.stringify(res.headers));
 
       res.setEncoding('utf8');
       
-      
+      let responseData = '';
+
       res.on('data', (d) => {
-        responseData.push(d);
+        responseData += d;
       });
       
       res.on('end', (e) => {
-        let fullResponse = responseData.join();
+        let setlist = findMostRecentSetlist(JSON.parse(responseData).setlist);
+        console.log('setlist: ' + setlist.toString());
         
-        console.log('fullResponse: ' + fullResponse);
+        doCallback(setlist, event, callback);
         
-        
-        doCallback('coming soon', event, callback);
+        /* (format for yr convenience)
+        name: string,
+        artistMbid: string,
+        cover: {
+          isCover: boolean
+          originalAristMbid: string (optional),
+          originalArtistName: string (optional)
+        } */
       });
       
       res.on('error', (e) => {
@@ -56,46 +64,71 @@ function searchForSetlist(event, callback) {
         
         doCallback(errorMessage, event, callback);
       });
-      
     });
 
   } else {
-    // This should never happen (lol)
-    doCallback(errorMessage + ' lol', event, callback);
+    doCallback(errorMessage, event, callback);
   }
 }
 
 
 function findMostRecentSetlist(setlists) {
-  let validSetlist;
+  let setlist, foundSetlist;
 
   if (setlists && setlists.length > 0) {
-    
     // Check each setlist until we find one with at least one song
-    //setlists.forEach(function (item, index) {
-      //if (item.sets.set.length > 0 && item.sets.set[0].song.length > 0) {
-          // console.log('Success!!!!');
-
-          // validSetlist = item.sets.set[0].song; 
-          // processSetlist(validSetlist);
-
-          // Quit once a valid setlist is found
-          // return;
-      // }
-    //});
+    setlists.forEach(function (item) {
+      if (item.sets.set.length > 0 && item.sets.set[0].song.length > 0 && !foundSetlist) {
+           setlist = processSetlist(item.sets.set);
+           foundSetlist = true;
+       }
+    });
   }
 
-  return validSetlist; 
+  return setlist; 
 }
-
-/*
 
 function processSetlist(setlistToProcess) {
-  // do something here with the array of songs: objects with name, maybe info props
+  let setlist = [];
+  
+  setlistToProcess.forEach(function (item, index) {
+    item.song.forEach(function (i, x) {
+      setlist.push({
+        name: getSongName(i),
+        artistMbid: artistMbid,
+        // do we need the artist name here?
+        cover: getSongCoverDetails(i)
+      });
+    });
+  });
+  
+  return setlist;
 }
 
-*/
+function getSongName(song) {
+  let name = '';
+      
+  if (song.name) {
+    name = song.name;
+  } else if (song.info) {
+    if (song.info.charAt(0) == '"') {
+      name = song.info.substring(1, song.info.length - 1);
+    } else {
+      name = song.info;
+    } 
+  }
+  return name.toLowerCase();
+}
 
+function getSongCoverDetails(song) {
+  if (song.cover && song.cover.mbid /* cover artist mbid */ && song.cover.name) {
+    return {
+      isCover: true,
+      originalArtistMbid: song.cover.mbid,
+      originalArtistName: song.cover.name
+    }
+  } else return { isCover: false }      
+}
 
 function doCallback(m, e, cb) {
   cb(null, {
