@@ -45,6 +45,7 @@ provider:
 # you can define service wide environment variables here
   environment:
     SETLISTFM_API_KEY: ${file(./serverless.env.yml):${self:provider.stage}.SETLISTFM_API_KEY}
+    SPOTIFY_CLIENT_ID: ${file(./serverless.env.yml):${self:provider.stage}.SPOTIFY_CLIENT_ID}
     STRING_ERROR: An unexpected error occurred, try again later!
 
 # you can add packaging information here
@@ -65,4 +66,4 @@ provider:
 functions:
   - ${file(functions/searchArtists.yml)}
   - ${file(functions/searchSetlists.yml)}
-
+  - ${file(functions/createPlaylist.yml)} 

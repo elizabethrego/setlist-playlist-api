@@ -1,0 +1,22 @@
+
+searchSetlists:
+    handler: src/createPlaylist.handler
+    description: Search for tracks of the setlist and add them to a Spotify playlist
+    events:
+      - http:
+          path: createPlaylist/handler
+          method: post
+          request:
+            parameters:
+              querystrings:
+                setlist: false
+                artist: false
+    environment:
+      SPOTIFY_AUTH_ENDPOINT: https://accounts.spotify.com/authorize
+      SPOTIFY_API_DOMAIN: https://api.spotify.com
+      SPOTIFY_API_SEARCH_TRACK_ENDPOINT: /v1/search
+      SPOTIFY_API_CREATE_PLAYLIST_ENDPOINT:   /v1/users/{user_id}/playlists
+      SPOTIFY_API_ADD_PLAYLIST_TRACKS_ENDPOINT: /v1/playlists/{playlist_id}/tracks
+      SPOTIFY_AUTH_SCOPES: user-read-private playlist-modify-public
+      #SPOTIFY_AUTH_REDIRECT_URI:
+

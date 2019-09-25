@@ -9,7 +9,8 @@ searchSetlists:
           request:
             parameters:
               querystrings:
-                artist: false
+                artistName: false
+                artistMbid: false
     environment:
       SETLISTFM_SEARCH_SETLIST_ENDPOINT: https://api.setlist.fm/rest/1.0/search/setlists?artistMbid=
       STRING_NO_SETLIST_MATCH: Sorry, no setlist found.
