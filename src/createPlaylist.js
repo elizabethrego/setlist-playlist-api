@@ -20,9 +20,9 @@ module.exports.handler = (event, context, callback) => {
 };
 
 function parseEventBody(event) {
-  if (event.body)
+  if (event.body && event.body.message)
   {
-    let body = JSON.parse(event.body);
+    let body = JSON.parse(event.body.message);
     if (body.token && body.setlist && body.artist) {
       token = body.token;
 
