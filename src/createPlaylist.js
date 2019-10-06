@@ -8,7 +8,8 @@ const searchTrackEndpoint = process.env.SPOTIFY_API_SEARCH_TRACK_ENDPOINT;
 const noMatchMessage = process.env.STRING_NO_SETLIST_MATCH;
 const errorMessage = process.env.STRING_ERROR;
 
-let options, token, setlist, artist;
+let options, token;
+let setlistInfo = {};
 
 module.exports.handler = (event, context, callback) => {
   console.log('Request:' + JSON.stringify(event));
@@ -18,26 +19,36 @@ module.exports.handler = (event, context, callback) => {
   createPlaylist(event, callback);
 };
 
+function parseEventBody(event) {
+  if (event.body)
+  {
+    let body = JSON.parse(event.body);
+    if (body.token && body.setlist && body.artist) {
+      token = body.token;
+
+      options = {
+        headers: {
+          'Authorization': 'Bearer ' + token;
+        }
+      };
+
+      setlistInfo.selist =  body.setlist;
+      setlistInfo.artist =  body.artistName;
+      
+      console.log('Token:' + token);
+      console.log('Setlist: ' + setlistInfo.setlist);
+      console.log('Artist: ' + setlistInfo.artist);
+    } else {
+      console.log(errorMessage);
+    }
+  } 
+}
+
 function createPlaylist(event, callback) {
 
-  if (event.queryStringParameters 
-    && event.queryStringParameters.token
-    && event.queryStringParameters.setlist 
-    && event.queryStringParameters.artist) {
-    token = event.queryStringParameters.token;
+  parseEventBody();
 
-    options = {
-      headers: {
-        'Authorization': 'Bearer ' + token;
-      }
-    };
-
-    setlist =  event.queryStringParameters.setlist;
-    artist =  event.queryStringParameters.artistName;
-    
-    console.log('Token:' + token);
-    console.log('Setlist: ' + setlist);
-    console.log('Artist: ' + artist);
+  creasePlaylistFromTracklist(setlistInfo); 
 
     /* (format for yr convenience)
     name: string,
@@ -60,13 +71,13 @@ function createPlaylistFromTrackList(trackList) {
   // body: uris (comma separated list of track URIs)
 }
 
-function buildTrackList(setlist) {
+function buildTrackList() {
   let trackList = []; // might need not to initialize
 
   let track = {};
 
-  setlist.forEach(function (item, index) {
-    track = searchForTrack(item);
+  setlistInfo.setlist.forEach(function (item, index) {
+    track = searchForTrack(item.name);
 
     if (track) { // do a better check here
       trackList.push(track);
@@ -103,7 +114,7 @@ function formatName(name) {
 }
 
 function formatSearchQuery(track) {
-  let query = '?q=' + formatName(track) + '+' + formatName(artistName) + '&type=track';
+  let query = '?q=' + formatName(track) + '+' + formatName(setlistInfo.artist) + '&type=track';
 
   console.log('query: ' + query);
   return query;
