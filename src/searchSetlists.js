@@ -45,9 +45,16 @@ function searchForSetlist(event, callback) {
       
       res.on('end', (e) => {
         let setlist = findMostRecentSetlist(JSON.parse(responseData).setlist);
-        console.log('setlist: ' + setlist.toString());
         
-        doCallback(setlist, event, callback);
+        if (setlist) {
+          console.log('setlist: ' + setlist.toString());
+        
+          doCallback(setlist, event, callback);
+        } else {
+          console.log('No setlist found.');
+
+          doCallback(errorMessage, event, callback);
+        }
         
         /* (format for yr convenience)
         name: string,

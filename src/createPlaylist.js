@@ -8,14 +8,7 @@ const searchTrackEndpoint = process.env.SPOTIFY_API_SEARCH_TRACK_ENDPOINT;
 const noMatchMessage = process.env.STRING_NO_SETLIST_MATCH;
 const errorMessage = process.env.STRING_ERROR;
 
-const options = {
-  headers: {
-    'Accept': 'application/json',
-    'x-api-key': process.env.SETLISTFM_API_KEY
-  }
-};
-
-let setlist, artist;
+let options, token, setlist, artist;
 
 module.exports.handler = (event, context, callback) => {
   console.log('Request:' + JSON.stringify(event));
@@ -27,20 +20,33 @@ module.exports.handler = (event, context, callback) => {
 
 function createPlaylist(event, callback) {
 
-  if (event.queryStringParameters && event.queryStringParameters.setlist && event.queryStringParameters.artist) {
-    setlist =  event.queryStringParameters.artistMbid;
+  if (event.queryStringParameters 
+    && event.queryStringParameters.token
+    && event.queryStringParameters.setlist 
+    && event.queryStringParameters.artist) {
+    token = event.queryStringParameters.token;
+
+    options = {
+      headers: {
+        'Authorization': 'Bearer ' + token;
+      }
+    };
+
+    setlist =  event.queryStringParameters.setlist;
     artist =  event.queryStringParameters.artistName;
+    
+    console.log('Token:' + token);
     console.log('Setlist: ' + setlist);
     console.log('Artist: ' + artist);
 
-            /* (format for yr convenience)
-        name: string,
-        artistMbid: string,
-        cover: {
-          isCover: boolean
-          originalAristMbid: string (optional),
-          originalArtistName: string (optional)
-        } */
+    /* (format for yr convenience)
+    name: string,
+    artistMbid: string,
+    cover: {
+      isCover: boolean
+      originalAristMbid: string (optional),
+      originalArtistName: string (optional)
+    } */
 
   } else {
     //doCallback(errorMessage, event, callback);
@@ -73,8 +79,34 @@ function buildTrackList(setlist) {
   return trackList.join(',');
 }
 
-function searchForTrack() {
+function searchForTrack(track) {
 
+  let query = formatSearchQuery;
+  doRequest(query, options)
+
+}
+
+function formatName(name) {
+  let splitName = name.split(' ');
+  let formattedName = '';
+
+  for (let i = 0; i < splitName.length; i++){
+    formattedName += splitName[i];
+
+    if (i < splitName.length - 1) {
+      formattedName += '+';
+    }
+  }
+
+  console.log('formatted name: ' + formattedName);
+  return formattedName;
+}
+
+function formatSearchQuery(track) {
+  let query = '?q=' + formatName(track) + '+' + formatName(artistName) + '&type=track';
+
+  console.log('query: ' + query);
+  return query;
 }
 
 function doRequest (URL, options) {
@@ -94,10 +126,11 @@ function doRequest (URL, options) {
     });
     
     res.on('end', (e) => {
-      let setlist = findMostRecentSetlist(JSON.parse(responseData).setlist);
-      console.log('setlist: ' + setlist.toString());
+      console.log('end response: ' + JSON.stringify(responseData));
+      //let setlist = findMostRecentSetlist(JSON.parse(responseData).setlist);
+      //console.log('setlist: ' + setlist.toString());
       
-      doCallback(setlist, event, callback);
+      //doCallback(setlist, event, callback);
     });
     
     res.on('error', (e) => {

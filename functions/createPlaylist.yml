@@ -1,5 +1,4 @@
-
-searchSetlists:
+createPlaylist:
     handler: src/createPlaylist.handler
     description: Search for tracks of the setlist and add them to a Spotify playlist
     events:
@@ -12,7 +11,7 @@ searchSetlists:
                 setlist: false
                 artist: false
     environment:
-      SPOTIFY_AUTH_ENDPOINT: https://accounts.spotify.com/authorize
+      #SPOTIFY_AUTH_ENDPOINT: https://accounts.spotify.com/authorize
       SPOTIFY_API_DOMAIN: https://api.spotify.com
       SPOTIFY_API_SEARCH_TRACK_ENDPOINT: /v1/search
       SPOTIFY_API_CREATE_PLAYLIST_ENDPOINT:   /v1/users/{user_id}/playlists
