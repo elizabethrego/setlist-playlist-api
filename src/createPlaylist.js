@@ -28,7 +28,7 @@ function parseEventBody(event) {
 
       options = {
         headers: {
-          'Authorization': 'Bearer ' + token;
+          'Authorization': 'Bearer ' + token
         }
       };
 
@@ -46,9 +46,9 @@ function parseEventBody(event) {
 
 function createPlaylist(event, callback) {
 
-  parseEventBody();
+  parseEventBody(event);
 
-  creasePlaylistFromTracklist(setlistInfo); 
+  createPlaylistFromTrackList(setlistInfo); 
 
     /* (format for yr convenience)
     name: string,
@@ -58,10 +58,6 @@ function createPlaylist(event, callback) {
       originalAristMbid: string (optional),
       originalArtistName: string (optional)
     } */
-
-  } else {
-    //doCallback(errorMessage, event, callback);
-  }
 }
 
 function createPlaylistFromTrackList(trackList) {
