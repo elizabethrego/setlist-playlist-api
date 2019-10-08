@@ -11,109 +11,104 @@ const errorMessage = process.env.STRING_ERROR;
 
 let options, token;
 let setlistInfo = {};
-let counter = 0;
 
 module.exports.handler = (event, context, callback) => {
     console.log('Request:' + JSON.stringify(event));
 
-    // Find artist matching search term via Setlist.fm API
-    // Pass callback function to fulfill promise when finished
-    createPlaylist(event, callback);
+    // Find each song in setlist and create Spotify  playlist
+    createPlaylist(event)
+    .then( (result) => { doCallback( { success: true, message: result }, event, callback) })
+    .catch( (error) => { doCallback( { success: false, message: error }, event, callback) });
 };
 
-function createPlaylist(event, callback) {
+function createPlaylist(event) {
+  return new Promise((resolve, reject) => {
 
-  if (event.body && event.body.message) {
-    let body = event.body.message;
+    if (event.body && event.body.message) {
+      let body = event.body.message;
 
-    if (body.token && body.setlist && body.artistName) {
-      token = body.token;
+      if (body.token && body.setlist && body.artistName) {
+        token = body.token;
 
-      options = {
-          headers: {
-              'Authorization': 'Bearer ' + token
-          }
-      };
+        options = {
+            headers: {
+                'Authorization': 'Bearer ' + token
+            }
+        };
 
-      setlistInfo.setlist = body.setlist;
-      setlistInfo.artist = body.artistName;
+        setlistInfo.setlist = body.setlist;
+        setlistInfo.artist = body.artistName;
 
-      processEachSong()
-      .then(function(trackList) {
-        console.log('finished processing each song');
-        processTrackList(trackList);
-      }).then(function(result) {
-        console.log('you got here');
-        //createPlaylistOnSpotify(result.uris);
-        // do something with the missing songs idk
-      }).catch(function(error) {
-        console.log("Error: " + error);
-        // reject(error);
-      });
-    } else {
-      console.log(errorMessage);
+        processEachSong()
+        .then( (trackList) => { return processTrackList(trackList); })
+        .then( (result) => { return createPlaylistOnSpotify(result); })
+        .then( (uris) => { resolve(uris); })
+        .catch( (error) => { reject(error); });
+      } else {
+        reject(errorMessage);
+      }
     }
-  }
-
-    /* (format for yr convenience)
-    name: string,
-    artistMbid: string,
-    cover: {
-      isCover: boolean
-      originalAristMbid: string (optional),
-      originalArtistName: string (optional)
-    } */
+  });
 }
 
 function processEachSong() {
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
     let trackList = [];
     let trackListPromises = [];
     
-    setlistInfo.setlist.forEach(function(item, index) {
-      
-      trackListPromises[index] = new Promise(function (innerResolve) {
-        
-        searchForTrack(item.name)
-          .then(function(trackUri) {
-            console.log('counter: ' + counter);
-      counter++;
-            console.log('saving trackUri ' + trackUri + ' for song ' + item.name + ' at index ' + index);
-            trackList[index] = trackUri;
-            return innerResolve(trackUri);
-          }).catch(function(error) {
-            console.log("Error for index " + index + ": " + error);
-          });
+    setlistInfo.setlist.forEach( (item, index) => {
+      trackListPromises[index] = new Promise( (innerResolve) => {
+        searchForTrack(item.name).then( (trackUri) => {
+          trackList[index] = trackUri;
+          return innerResolve(trackUri);
+        }).catch( (error) => { reject(error); });
       });
     });
 
     Promise.all(trackListPromises)
-    .then(function() {
-      console.log('done');
-      resolve(trackList);
+    .then( () => { resolve(trackList); });
+
+  });
+}
+
+function searchForTrack(track) {
+  return new Promise((resolve, reject) => {
+        let query = formatSearchQuery(track);
+
+        doRequest(spotifyURLRoot + searchTrackEndpoint + query, options)
+        .then(function(result) { return processSearchResult(track, result); })
+        .then(function (matchingUri) { resolve(matchingUri); }) // return the matching URI, or nada
+        .catch(function(error) { console.log('catching'); reject(error); });
     });
+}
 
-    setlistInfo.setlist.forEach(function(item, index) {
-      searchForTrack(item.name)
-        .then(function(trackUri) {
-            trackList[index] = trackUri;
-            console.log('saving trackUri ' + trackUri + ' for song ' + item.name + ' at index ' + index);
+function processSearchResult(songName, searchResult) {
+  return new Promise((resolve, reject) => {
+    if (searchResult && JSON.parse(searchResult).tracks) {
+        let potentialMatches = JSON.parse(searchResult).tracks.items;
 
-            if (index == setlistInfo.setlist.length) {
-              resolve(trackList); // trackList.join(',');
-            }
-        }).catch(function(error) {
-            console.log("Error for index " + index + ": " + error);
-        });
-    });
-
-    // always empty
-    return trackList.join(',');
+        if (potentialMatches.length) {  
+          potentialMatches.forEach( (item, index) => {
+              if (checkSongNameMatch(songName, item.name) && item.uri && item.name) {
+                  resolve(item.uri);
+              } else {
+                if (index == potentialMatches.length) {
+                  // TODO: Check for cover
+                  console.log("No match for track \"" + songName + "\".");
+                  resolve();
+                }
+              }
+          });
+        } else {
+          console.log("No match for track \"" + songName + "\".");
+          resolve();
+        }
+      }
   });
 }
 
 function processTrackList(trackList) {
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
     let uris = '';
 
     let missingSongs = [];
@@ -121,6 +116,9 @@ function processTrackList(trackList) {
     for (let i = 0; i < setlistInfo.setlist.length; i++) {
       if (trackList[i]) {
         uris += trackList[i];
+        if (i < setlistInfo.setlist.length - 1) {
+          uris += ',';
+        }
       } else {
         missingSongs.push(setlistInfo.setlist[i].name);
       }
@@ -137,31 +135,15 @@ function processTrackList(trackList) {
   });
 }
 
-function searchForTrack(track) {
-    return new Promise(function(resolve, reject) {
-        let query = formatSearchQuery(track);
-
-        doRequest(spotifyURLRoot + searchTrackEndpoint + query, options)
-        .then(function(result) {
-          return processSearchResult(track, result);
-        }).then(function (matchingUri) {
-          // console.log('searchForTrack: matchingUri: ' + matchingUri);
-
-          if (matchingUri) {
-              resolve(matchingUri);
-          } else {
-              reject("3No match for track \"" + track + "\".");
-          }
-        }).catch(function(error) {
-            reject(error);
-        });
-    });
+function createPlaylistOnSpotify(result) {
+  return new Promise((resolve, reject) => {
+    // just passing it back for now, should do something like create a playlist
+    resolve(result.uris);
+  });
 }
 
-function createPlaylistOnSpotify(uris) {
-  return new Promise(function(resolve, reject) {
-
-  });
+function checkSongNameMatch(songNameToMatch, potentialMatch) {
+  return potentialMatch.toLowerCase() == songNameToMatch.toLowerCase();
 }
 
 function formatName(name) {
@@ -179,54 +161,11 @@ function formatName(name) {
 }
 
 function formatSearchQuery(track) {
-    let query = '?q=' + formatName(track) + '+' + formatName(setlistInfo.artist) + '&type=track';
-    return query;
-}
-
-function processSearchResult(songName, searchResult) {
-  return new Promise(function(resolve, reject) {
-    if (searchResult) {
-        let potentialMatches = JSON.parse(searchResult).tracks.items;
-
-        if (potentialMatches.length && checkSongNameMatch(songName, potentialMatches[0].name) && potentialMatches[0].uri) {
-            resolve(potentialMatches[0].uri);
-        } else {
-            if (potentialMatches.length > 1) {
-                // loop thru the rest
-                let foundMatch = false;
-                
-                potentialMatches.forEach(function(item, index) {
-                    if (checkSongNameMatch(songName, item.name)) {
-                        resolve(item.uri);
-                    } else {
-                      if (index == potentialMatches.length) {
-                        reject("1No match for track \"" + songName + "\".");
-                      }
-                    }
-                });
-            } else {
-              reject("2No match for track \"" + songName + "\".");
-            }
-        }
-    }
-  });
-}
-
-function checkSongNameMatch(songNameToMatch, potentialMatch) {
-  // console.log('checkSongNameMatch: checking \"' + songNameToMatch.toLowerCase() + "\" and \"" + potentialMatch.toLowerCase() + "\".");
-  
-  let result = false;
-  if (potentialMatch.toLowerCase() == songNameToMatch.toLowerCase()) {
-    result = true;
-    // console.log('checkSongNameMatch: it\'s a match'); 
-  } else {
-    // console.log('checkSongNameMatch: it\'s not a match');
-  }
-  return result;
+    return '?q=' + formatName(track) + '+' + formatName(setlistInfo.artist) + '&type=track';
 }
 
 function doRequest(url, options) {
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
 
     https.get(url, options, (res) => {
       // console.log('Status Code:' + res.statusCode);
@@ -235,22 +174,16 @@ function doRequest(url, options) {
       res.setEncoding('utf8');
 
       let responseData = '';
-
-      res.on('data', (d) => {
-        responseData += d;
-      });
+      res.on('data', (d) => { responseData += d; });
 
       res.on('end', (e) => {
-        // console.log('end response' /* + JSON.stringify(responseData) */ );
-        resolve(responseData);
-        //doCallback(setlist, event, callback);
+        let potentialError = JSON.parse(responseData).error;
+
+        if (potentialError) { reject(potentialError.message); }
+        else { resolve(responseData); }
       });
 
-      res.on('error', (e) => {
-        console.log('Error:' + e);
-        reject(e);
-        //doCallback(errorMessage, event, callback);
-      });
+      res.on('error', (e) => { reject(e); });
     });
   });
 }
