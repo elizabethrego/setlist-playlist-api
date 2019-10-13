@@ -28,19 +28,6 @@ const createPlaylist = (setlistInfo) => {
   })
 }
 
-const createPlaylistOnSpotify = (result) => {
-  return new Promise((resolve, reject) => {
-    // just passing it back for now, should do something like create a playlist
-
-    doRequest(this.strings.spotifyURLRoot + this.strings.createPlaylistEndpoint + query, this.httpOptions)
-      .then( (searchResult) => this.findMatchingTrackUri(song, searchResult) ) 
-      .then(  (matchingUri) => resolve(matchingUri) ) // return the matching URI, or nada
-      .catch( (error) => reject(error) ) // will cause the whole playlist to fail
-
-    resolve(result.uris)
-  })
-}
-
 const checkSongNameMatch = (firstName = '', secondName = '') => {
   return firstName.toLowerCase() == secondName.toLowerCase()
 }
@@ -58,9 +45,32 @@ const formatArtistOrSongName = (name = '') => {
   return formattedName
 }
 
-const doRequest = (url, options) => {
+const doGetRequest = (url, options) => {
   return new Promise((resolve, reject) => {
     https.get(url, options, (res) => {
+      res.setEncoding('utf8')
+
+      let responseData = ''
+
+      res.on('data', (d) => { responseData += d } )
+
+      res.on('end', (e) => {
+        let potentialError = JSON.parse(responseData).error
+
+        if (potentialError) {
+          reject(potentialError.message)
+        }
+        else resolve(responseData)
+      })
+
+      res.on('error', (e) => reject(e) )
+    })
+  })
+}
+
+const doPostRequest = (url, options, body) => {
+  return new Promise((resolve, reject) => {
+    https.post(url, options, (res) => {
       res.setEncoding('utf8')
 
       let responseData = ''
@@ -129,7 +139,7 @@ class SetlistInfo {
     return new Promise((resolve, reject) => {
       let query = this.formatSearchQuery(song)
 
-      doRequest(this.strings.spotifyURLRoot + this.strings.searchTrackEndpoint + query, this.httpOptions)
+      doGetRequest(this.strings.spotifyURLRoot + this.strings.searchTrackEndpoint + query, this.httpOptions)
       .then( (searchResult) => this.findMatchingTrackUri(song, searchResult) ) 
       .then(  (matchingUri) => resolve(matchingUri) ) // return the matching URI, or nada
       .catch( (error) => reject(error) ) // will cause the whole playlist to fail
@@ -176,6 +186,19 @@ class SetlistInfo {
       } else reject(process.env.STRING_ERROR)
     })
   }
+
+  createPlaylistOnSpotify(result) {
+  return new Promise((resolve, reject) => {
+    // just passing it back for now, should do something like create a playlist
+
+    doGetRequest(this.strings.spotifyURLRoot + this.strings.createPlaylistEndpoint + query, this.httpOptions)
+      .then( (searchResult) => this.findMatchingTrackUri(song, searchResult) ) 
+      .then(  (matchingUri) => resolve(matchingUri) ) // return the matching URI, or nada
+      .catch( (error) => reject(error) ) // will cause the whole playlist to fail
+
+    resolve(result.uris)
+  })
+}
   
 }
 
@@ -185,6 +208,5 @@ module.exports.handler = (event, context, callback) => {
     // Find each song in setlist and create Spotify  playlist
     createPlaylist(processedEvent)
     .then( (result) => callback(null, result) )
-    .catch( (error) => {
-      return callback(error) }) 
+    .catch( (error) => callback(error) ) 
 }
