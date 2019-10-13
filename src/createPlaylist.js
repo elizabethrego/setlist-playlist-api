@@ -1,7 +1,6 @@
 'use strict'
 
 const https = require('https')
-const promise = require('promise')
 
 const processEvent = (eventToProcess) => {
   if (eventToProcess.body && eventToProcess.body.message) {
@@ -32,6 +31,12 @@ const createPlaylist = (setlistInfo) => {
 const createPlaylistOnSpotify = (result) => {
   return new Promise((resolve, reject) => {
     // just passing it back for now, should do something like create a playlist
+
+    doRequest(this.strings.spotifyURLRoot + this.strings.createPlaylistEndpoint + query, this.httpOptions)
+      .then( (searchResult) => this.findMatchingTrackUri(song, searchResult) ) 
+      .then(  (matchingUri) => resolve(matchingUri) ) // return the matching URI, or nada
+      .catch( (error) => reject(error) ) // will cause the whole playlist to fail
+
     resolve(result.uris)
   })
 }
@@ -91,6 +96,8 @@ class SetlistInfo {
     this.strings = {
       spotifyURLRoot: process.env.SPOTIFY_API_DOMAIN,
       searchTrackEndpoint: process.env.SPOTIFY_API_SEARCH_TRACK_ENDPOINT
+      createPlaylistEndpoint: process.env.SPOTIFY_API_CREATE_PLAYLIST_ENDPOINT
+      addSongsToPlaylistEndpoint: process.env.SPOTIFY_API_ADD_PLAYLIST_TRACKS_ENDPOINT
     }
   }
   
