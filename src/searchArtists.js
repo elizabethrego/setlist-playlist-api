@@ -1,108 +1,99 @@
-'use strict';
+'use strict'
 
-const https = require('https');
+const https = require('https')
 
-const searchArtistURL = process.env.SETLISTFM_SEARCH_ARTIST_ENDPOINT; 
-
-const noMatchMessage = process.env.STRING_NO_ARTIST_MATCH;
-const noArtistProvidedMessage = process.env.STRING_NO_ARTIST_PROVIDED;
-const errorMessage = process.env.STRING_ERROR;
-
-const options = {
-  headers: {
-    'Accept': 'application/json',
-    'x-api-key': process.env.SETLISTFM_API_KEY
-  }
-};
-
-module.exports.handler = (event, context, callback) => {
-  console.log('Request:', JSON.stringify(event));
-
-  // Find artist matching search term via Setlist.fm API
-  // Pass callback funftion to fulfill promise when finished
-  searchForArtist(event, callback);
-};
-
-function searchForArtist(event, callback) {
-
-  if (event.queryStringParameters && event.queryStringParameters.artist) {
-      let searchTermForArtist =  event.queryStringParameters.artist;
-      console.log('Searching for Artist:', searchTermForArtist);
-
-      https.get(searchArtistURL + searchTermForArtist, options, (res) => {
-
-        console.log('Status Code:', res.statusCode);
-        console.log('Headers:', JSON.stringify(res.headers));
-
-        res.setEncoding('utf8');
-
-        res.on('data', (d) => {
-          if (JSON.parse(d) && JSON.parse(d).artist) {
-            let matchingArtist = findMatchingArtist(JSON.parse(d).artist, searchTermForArtist);
-            
-            if (matchingArtist && matchingArtist.mbid) {
-              console.log('Matching Artist: ', matchingArtist);
-
-              doCallback(matchingArtist, event, callback);
-            } else {
-              doCallback(noMatchMessage, event, callback);
-            }
-
-          } else {
-            doCallback(noMatchMessage, event, callback);
-          }
-        });
-
-        }).on('error', (e) => {
-          console.log('Error:', e);
-          
-          doCallback(errorMessage, event, callback);
-        });
-
-    } else {
-      // No artist was provided to search for
-      doCallback(noArtistProvidedMessage, event, callback);
-    }
+const processEvent = (eventToProcess) => {
+  if (eventToProcess.queryStringParameters && eventToProcess.queryStringParameters.artist) {
+    return eventToProcess.queryStringParameters.artist
+  } else return false
 }
 
-function findMatchingArtist(artists, searchTerm) {
-  let match;
+const doGetRequest = (url, options) => {
+  return new Promise((resolve, reject) => {
+    https.get(url, options, (res) => {
+      res.setEncoding('utf8')
 
-  if (artists && artists.length > 0) {
-    
-    // Check each search result until we find an exact match (of lowercasers)
-    artists.forEach(function (item, index) {
-      if (checkArtistMatch(searchTerm, item.name)) {
+      let responseData = ''
+
+      res.on('data', (d) => responseData += d )
+
+      res.on('end', (e) => {
+        let potentialError = JSON.parse(responseData).error
+
+        if (potentialError) reject(potentialError.message)
+        else resolve(responseData)
+      })
+
+      res.on('error', (e) => reject(e) )
+    })
+  })
+}
+
+const searchForArtist = (searchTerm) => {
+  return new Promise((resolve, reject) => {
+    console.log(`Searching for Artist: ${searchTerm}`)
+
+    const searchArtistURL = process.env.SETLISTFM_SEARCH_ARTIST_ENDPOINT
+    const noMatchMessage = process.env.STRING_NO_ARTIST_MATCH
+
+    let artistSearch = new ArtistSearch(searchTerm)
+    let matchingArtist
+  
+    doGetRequest(searchArtistURL + artistSearch.name, artistSearch.httpOptions)
+    .then( (searchResults) => {
+      let potentialArtists = JSON.parse(searchResults).artist
+      matchingArtist = artistSearch.findMatchingArtist(potentialArtists)
+      
+      if (matchingArtist) resolve(matchingArtist)
+      else reject(noMatchMessage)
+    }).catch( (error) => reject(error) )
+  })
+}
+
+const checkArtistMatch = (searchedArtist = '', potentialMatch = '') => {
+  if (searchedArtist.length && potentialMatch.length) {
+    return searchedArtist.toLowerCase() == potentialMatch.toLowerCase()
+  } else return false
+}
+
+class ArtistSearch {
+  constructor(name = '') {
+    this.httpOptions = {
+      headers: {
+        'Accept': 'application/json',
+        'x-api-key': process.env.SETLISTFM_API_KEY
+      }
+    }
+
+    this.name = name
+    this.strings = {} 
+  }
+
+  findMatchingArtist(artists) {
+    let match, foundMatch
+
+    if (artists && artists.length > 0) {
+      // Check each search result until we find an exact match (of lowercasers)
+      for (let i = 0; i < artists.length; i++) {
+        if (!foundMatch && checkArtistMatch(this.name, artists[i].name)) {
           // Matching artist found
           match = {
-            mbid: item.mbid,
-            name: item.name
-          };
-
-          // Quit once a match is found
-          return;
-      }
-    });
+            mbid: artists[i].mbid,
+            name: artists[i].name
+          }
+          foundMatch = true
+        }
+      } return match
+    }
   }
-
-  return match; 
 }
 
-function checkArtistMatch(searchedArtist, potentialMatch) {
-  return searchedArtist.toLowerCase() == potentialMatch.toLowerCase();
-}
+module.exports.handler = (event, context, callback) => {
+  // console.log('Request:', JSON.stringify(event));
+  let processedEvent = processEvent(event)
 
-
-function doCallback(m, e, cb) {
-  cb(null, {
-    statusCode: 200,
-    body: JSON.stringify(
-      {
-        message: m,
-        input: e,
-      },
-      null,
-      2
-    ),
-  });
-}
+  // Find artist matching search term via Setlist.fm API
+  searchForArtist(processedEvent)
+  .then( (artist) => callback(null, artist) )
+  .catch( (error) =>  callback(error) )
+};

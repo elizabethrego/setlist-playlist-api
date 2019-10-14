@@ -3,15 +3,13 @@
 const https = require('https')
 
 const processEvent = (eventToProcess) => {
-  if (eventToProcess.queryStringParameters 
-    && eventToProcess.queryStringParameters.artistName && eventToProcess.queryStringParameters.artistMbid) {
+  if (eventToProcess.queryStringParameters) {
     
     let params = eventToProcess.queryStringParameters
     if (params.artistName && params.artistMbid) { 
       return params
-    }
-    else return false
-  }
+    } else return false
+  } else return false
 }
 
 const doGetRequest = (url, options) => {
@@ -55,6 +53,7 @@ const searchForSetlist = (artistInfo) => {
           else reject(setlistSearch.strings.noMatchMessage)
         } else reject(errorMessage)
       })
+      .catch( () => reject(errorMessage) )
     } else reject(errorMessage);
   })
 }
