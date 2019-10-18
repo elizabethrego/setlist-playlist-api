@@ -14,6 +14,7 @@ createPlaylist:
       #SPOTIFY_AUTH_ENDPOINT: https://accounts.spotify.com/authorize
       SPOTIFY_API_DOMAIN: https://api.spotify.com
       SPOTIFY_API_SEARCH_TRACK_ENDPOINT: /v1/search
+      SPOTIFY_API_PROFILE_ENDPOINT: /v1/me
       SPOTIFY_API_CREATE_PLAYLIST_ENDPOINT:   /v1/users/{user_id}/playlists
       SPOTIFY_API_ADD_PLAYLIST_TRACKS_ENDPOINT: /v1/playlists/{playlist_id}/tracks
       SPOTIFY_AUTH_SCOPES: user-read-private playlist-modify-public
